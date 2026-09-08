@@ -193,15 +193,27 @@ export function createV2SessionReducer() {
           content: insertOrdinal(item.content, "text", event.data.ordinal, { type: "text", text: "" }),
         }))
       case "session.text.delta":
-        return updateContent(source, event.data.assistantMessageID, sessionID, "text", event.data.ordinal, (item) => ({
-          ...item,
-          text: item.text + event.data.delta,
-        }))
+        return updateContent(
+          source,
+          { 
+            messageID: event.data.assistantMessageID, 
+            sessionID, 
+            type: "text", 
+            ordinal: event.data.ordinal 
+          },
+          (item) => ({ ...item, text: item.text + event.data.delta }),
+        )
       case "session.text.ended":
-        return updateContent(source, event.data.assistantMessageID, sessionID, "text", event.data.ordinal, (item) => ({
-          ...item,
-          text: event.data.text,
-        }))
+        return updateContent(
+          source,
+          { 
+            messageID: event.data.assistantMessageID, 
+            sessionID, 
+            type: "text", 
+            ordinal: event.data.ordinal 
+          },
+          (item) => ({ ...item, text: event.data.text }),
+        )
       case "session.reasoning.started":
         return updateAssistant(source, event.data.assistantMessageID, sessionID, (item) => ({
           ...item,
@@ -215,22 +227,23 @@ export function createV2SessionReducer() {
       case "session.reasoning.delta":
         return updateContent(
           source,
-          event.data.assistantMessageID,
-          sessionID,
-          "reasoning",
-          event.data.ordinal,
-          (item) => ({
-            ...item,
-            text: item.text + event.data.delta,
-          }),
+          { 
+            messageID: event.data.assistantMessageID, 
+            sessionID, 
+            type: "reasoning", 
+            ordinal: event.data.ordinal 
+          },
+          (item) => ({ ...item, text: item.text + event.data.delta }),
         )
       case "session.reasoning.ended":
         return updateContent(
           source,
-          event.data.assistantMessageID,
-          sessionID,
-          "reasoning",
-          event.data.ordinal,
+          { 
+            messageID: event.data.assistantMessageID, 
+            sessionID, 
+            type: "reasoning", 
+            ordinal: event.data.ordinal 
+          },
           (item) => ({
             ...item,
             text: event.data.text,
@@ -460,16 +473,21 @@ function updateAssistant(
   }
 }
 
+interface UpdateContentTarget<T extends "text" | "reasoning"> {
+  messageID: string
+  sessionID: string
+  type: T
+  ordinal: number
+}
+
 function updateContent<T extends "text" | "reasoning">(
   source: readonly SessionMessageInfo[],
-  messageID: string,
-  sessionID: string,
-  type: T,
-  ordinal: number,
+  target: UpdateContentTarget<T>,
   apply: (
     item: Extract<Assistant["content"][number], { type: T }>,
   ) => Extract<Assistant["content"][number], { type: T }>,
 ) {
+  const { messageID, sessionID, type, ordinal } = target
   return updateAssistant(source, messageID, sessionID, (assistant) => {
     let index = -1
     return {

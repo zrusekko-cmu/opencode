@@ -153,4 +153,103 @@ describe("v2 session reducer", () => {
 
     expect(result).toMatchObject({ sessionID: "ses_1", missing: "msg_user", touched: [] })
   })
+
+  test("projects streaming reasoning content by ordinal", () => {
+    const reducer = createV2SessionReducer()
+    let messages: SessionMessageInfo[] = []
+    const apply = (input: object) => {
+      const result = reducer.reduce(messages, event(input))
+      if (result) messages = result.messages
+    }
+
+    apply({
+      ...base,
+      id: "evt_step",
+      type: "session.step.started",
+      data: {
+        sessionID: "ses_1",
+        assistantMessageID: "msg_assistant",
+        agent: "build",
+        model: { id: "model", providerID: "provider" },
+      },
+    })
+    apply({
+      ...base,
+      id: "evt_reasoning_start",
+      type: "session.reasoning.started",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, state: "thinking" },
+    })
+    apply({
+      ...base,
+      id: "evt_reasoning_delta",
+      type: "session.reasoning.delta",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, delta: "hmm" },
+    })
+    apply({
+      ...base,
+      id: "evt_reasoning_end",
+      type: "session.reasoning.ended",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, text: "hmm, ok", state: "done" },
+    })
+
+    expect(messages[0]).toMatchObject({
+      type: "assistant",
+      content: [{ type: "reasoning", text: "hmm, ok", state: "done" }],
+    })
+  })
+
+  test("updates the correct text content by ordinal", () => {
+    const reducer = createV2SessionReducer()
+    let messages: SessionMessageInfo[] = []
+    const apply = (input: object) => {
+      const result = reducer.reduce(messages, event(input))
+      if (result) messages = result.messages
+    }
+
+    apply({ ...base, id: "evt_step", type: "session.step.started", data: {
+      sessionID: "ses_1", assistantMessageID: "msg_assistant", agent: "build",
+      model: { id: "model", providerID: "provider" },
+    }})
+    apply({ ...base, id: "evt_t0_start", type: "session.text.started",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0 } })
+    apply({ ...base, id: "evt_t1_start", type: "session.text.started",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 1 } })
+    apply({ ...base, id: "evt_t0_end", type: "session.text.ended",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, text: "first" } })
+    apply({ ...base, id: "evt_t1_end", type: "session.text.ended",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 1, text: "second" } })
+
+    expect(messages[0]).toMatchObject({
+      content: [{ type: "text", text: "first" }, { type: "text", text: "second" }],
+    })
+  })
+
+  test("updates reasoning content without affecting text content", () => {
+    const reducer = createV2SessionReducer()
+    let messages: SessionMessageInfo[] = []
+    const apply = (input: object) => {
+      const result = reducer.reduce(messages, event(input))
+      if (result) messages = result.messages
+    }
+
+    apply({ ...base, id: "evt_step", type: "session.step.started", data: {
+      sessionID: "ses_1", assistantMessageID: "msg_assistant", agent: "build",
+      model: { id: "model", providerID: "provider" },
+    }})
+    apply({ ...base, id: "evt_text_start", type: "session.text.started",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0 } })
+    apply({ ...base, id: "evt_text_end", type: "session.text.ended",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, text: "unchanged" } })
+    apply({ ...base, id: "evt_reasoning_start", type: "session.reasoning.started",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, state: "thinking" } })
+    apply({ ...base, id: "evt_reasoning_end", type: "session.reasoning.ended",
+      data: { sessionID: "ses_1", assistantMessageID: "msg_assistant", ordinal: 0, text: "done", state: "done" } })
+
+    expect(messages[0]).toMatchObject({
+      content: [
+        { type: "text", text: "unchanged" },
+        { type: "reasoning", text: "done" },
+      ],
+    })
+  })
 })
