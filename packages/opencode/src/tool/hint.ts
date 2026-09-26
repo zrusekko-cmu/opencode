@@ -24,17 +24,21 @@ export const HintTool = Tool.define(
       parameters: Parameters,
       execute: (params: Schema.Schema.Type<typeof Parameters>, ctx: Tool.Context<Metadata>) =>
         Effect.gen(function* () {
-          yield* hint.get({
-            sessionID: ctx.sessionID,
-            problem: params.problem,
-          })
-
-          const state = yield* hint.next({
-            sessionID: ctx.sessionID,
-            problem: params.problem,
-          })
-
+          const state = yield* hint.next({ sessionID: ctx.sessionID, problem: params.problem })
           const resolved = state.level === 0 ? 1 : (state.level as 1 | 2 | 3)
+
+          if (state.revealed) {
+            return {
+              title: "Solution",
+              output: `Problem: ${params.problem}\n\nAll staged hints have been used. State the specific root cause and the precise fix for this problem, grounded only in evidence you've actually gathered (code you've read, commands you've run, hints already given). Name the exact faulty line or condition, explain why it fails, and give the minimal correction. Do not give a generic or templated answer; it must resolve the stated problem specifically.`,
+              metadata: {
+                problem: params.problem,
+                level: resolved,
+                maxLevel: 3,
+                revealed: true,
+              },
+            }
+          }
 
           const suffix =
             resolved === 1
